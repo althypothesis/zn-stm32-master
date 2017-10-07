@@ -8,6 +8,7 @@
 #define PING_RESPONSE_TIMEOUT 2
 #define PING_RESPONSE_INVALID 3
 #define PING_RESPONSE_UNKNOWN_ERROR 4
+#define PING_RESPONSE_CHECKSUM_ERROR 5
 
 class zn {
 	public:
@@ -16,10 +17,14 @@ class zn {
 		int ping(char pingId);
 		void list(bool deviceArray[]);
 		double responseTimeout;
+		Serial* debugInterface;
+		bool debugEnable;
 
 	private:
 		Serial* uart;
 		void serialAbort();
+		char checksum(char* data, int dataLength);
+		bool attemptRx(char* buffer, int rxLength);
 };
 
 #endif

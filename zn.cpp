@@ -7,16 +7,51 @@ zn::zn(mbed::Serial* uartInit, int initId) {
 	uart = uartInit;
 	zn::id = initId;
 	responseTimeout = 0.5;
+	debugEnable = 0;
 }
 
 void zn::serialAbort() { uart->abort_read(); }
 
-int zn::ping(char pingId) {
-	bool gotPong = false;
-	char pingRxBuf[32];
-	char pingRxChar;
+char zn::checksum(char* data, int dataLength) {
+	char retVal = 0;
+	for(int i = 0; i < dataLength; i++) {
+		retVal ^= data[i];
+	}
+	return retVal;
+}
+
+bool zn::attemptRx(char* attemptRxBuf, int rxLength) {
+	//char attemptRxBuf[32];
+	char attemptRxChar;
 	int rxIndex = 0;
-	bool timeout = true;
+	bool attemptTimeout = true;
+
+	Timer t;
+	t.start();
+
+	Timeout to;
+	to.attach(callback(this, &zn::serialAbort), (responseTimeout+0.1)); // in case we get stuck at a getc()
+
+	while(t.read() < responseTimeout) {
+		if(uart->readable()) {
+			attemptRxChar = uart->getc();
+			attemptRxBuf[rxIndex] = attemptRxChar;
+			rxIndex++;
+
+			if(rxIndex > (rxLength-1)) { 
+				attemptTimeout = false;
+				break;
+			}
+		}
+	}
+
+	t.stop();
+
+	return !attemptTimeout;
+}
+
+int zn::ping(char pingId) {
+	char responsePacket[16] = {};
 
 	// clear the serial buffer first
 	//char char1 = 0; 
@@ -25,52 +60,46 @@ int zn::ping(char pingId) {
 		char1 += 0;
 	}
 
-	char pingPacket[5] = { pingId, zn::id, 0x02, 0x00, 0x00 };
+	char pingPacket[6] = { pingId, zn::id, 0x03, 0x00, 0x00, 0x00 };
+	pingPacket[5] = checksum(pingPacket, sizeof(pingPacket));
 
-	uart->printf("%c%c%c%c%c", pingPacket[0], pingPacket[1], pingPacket[2], pingPacket[3], pingPacket[4] );
+	uart->printf("%c%c%c%c%c%c", pingPacket[0], pingPacket[1], pingPacket[2], pingPacket[3], pingPacket[4], pingPacket[5] );
 
-	Timer t;
-	t.start();
-
-	Timeout to;
-	to.attach(callback(this, &zn::serialAbort), (responseTimeout+0.1));
-
-	while(t.read() < responseTimeout) {
-		if(uart->readable()) {
-			pingRxChar = uart->getc();
-			pingRxBuf[rxIndex] = pingRxChar;
-			rxIndex++;
-
-			if(rxIndex > 6) { 
-				timeout = false;
-				break;
-			}
-		}
-	}
-
-	t.stop();
-
-	if(timeout) { // terminated due to timeout
-		strcpy(pingRxBuf, "");
+	if(!attemptRx(responsePacket, 8)) { // terminated due to timeout
+		strcpy(responsePacket, "");
 		return PING_RESPONSE_TIMEOUT;
 	}
 
-	char responseCmp[3] = { zn::id, pingId, 0x04 };
-	if(pingRxBuf[0] == responseCmp[0] && pingRxBuf[1] == responseCmp[1] && pingRxBuf[2] == responseCmp[2]) { gotPong = true; }
-	else if(strlen(pingRxBuf) < 1) {
-		strcpy(pingRxBuf, "");
-		return PING_RESPONSE_EMPTY;
-	} else { 
-		strcpy(pingRxBuf, "");
-		return PING_RESPONSE_INVALID;
-	}
-	
-	if(gotPong) {
-		strcpy(pingRxBuf, "");
-		return PING_RESPONSE_OK;
+	if(checksum(responsePacket, sizeof(responsePacket)) != 0 ) { 
+		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4], responsePacket[5], responsePacket[6], responsePacket[7]); }
+		strcpy(responsePacket, "");
+		return PING_RESPONSE_CHECKSUM_ERROR;
 	}
 
-	strcpy(pingRxBuf, "");
+	bool responsePacketEmpty = true;
+	for(unsigned int i = 0; i < sizeof(responsePacket); i++) {
+		if(responsePacket[i] != 0) {
+			responsePacketEmpty = false;
+			break;
+		}
+	}
+
+	if(responsePacketEmpty) {
+		strcpy(responsePacket, "");
+		return PING_RESPONSE_EMPTY;
+	} 
+	
+	char responseCmp[3] = { zn::id, pingId, 0x05 };
+	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
+		strcpy(responsePacket, "");
+		return PING_RESPONSE_OK;
+	} else { 
+		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4], responsePacket[5], responsePacket[6], responsePacket[7]); }
+		strcpy(responsePacket, "");
+		return PING_RESPONSE_INVALID;
+	}
+
+	strcpy(responsePacket, "");
 	return PING_RESPONSE_UNKNOWN_ERROR;
 }
 

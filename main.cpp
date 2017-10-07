@@ -79,6 +79,9 @@ void cmdPing(char* rxBuf) {
 				} case PING_RESPONSE_INVALID: {
 					pc.printf("Invalid Response\r\n");
 					break;
+				} case PING_RESPONSE_CHECKSUM_ERROR: {
+					pc.printf("Checksum Error\r\n");
+					break;
 				} default: {
 					pc.printf("Unknown Error\r\n");
 				}
@@ -102,6 +105,10 @@ int main() {
 	z.responseTimeout = 0.2;
 	pc.printf("\r\n\r\nCompiled: " __DATE__ " " __TIME__);
 	led = 1;
+
+	//debugging
+	z.debugInterface = &pc;
+	z.debugEnable = true;
 
 	while(1) {
 
