@@ -67,13 +67,13 @@ int zn::ping(char pingId) {
 
 	if(!attemptRx(responsePacket, 8)) { // terminated due to timeout
 		strcpy(responsePacket, "");
-		return PING_RESPONSE_TIMEOUT;
+		return ZN_RESPONSE_TIMEOUT;
 	}
 
 	if(checksum(responsePacket, sizeof(responsePacket)) != 0 ) { 
 		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4], responsePacket[5], responsePacket[6], responsePacket[7]); }
 		strcpy(responsePacket, "");
-		return PING_RESPONSE_CHECKSUM_ERROR;
+		return ZN_RESPONSE_CHECKSUM_ERROR;
 	}
 
 	bool responsePacketEmpty = true;
@@ -86,26 +86,85 @@ int zn::ping(char pingId) {
 
 	if(responsePacketEmpty) {
 		strcpy(responsePacket, "");
-		return PING_RESPONSE_EMPTY;
+		return ZN_RESPONSE_EMPTY;
 	} 
 	
 	char responseCmp[3] = { zn::id, pingId, 0x05 };
 	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
 		strcpy(responsePacket, "");
-		return PING_RESPONSE_OK;
+		return ZN_RESPONSE_OK;
 	} else { 
 		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4], responsePacket[5], responsePacket[6], responsePacket[7]); }
 		strcpy(responsePacket, "");
-		return PING_RESPONSE_INVALID;
+		return ZN_RESPONSE_INVALID;
 	}
 
 	strcpy(responsePacket, "");
-	return PING_RESPONSE_UNKNOWN_ERROR;
+	return ZN_RESPONSE_UNKNOWN_ERROR;
+}
+
+int zn::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
+	char responsePacket[16] = {};
+
+	// clear the serial buffer first
+	//char char1 = 0; 
+	while (uart->readable()) { 
+		char char1 = uart->getc(); 
+		char1 += 0;
+	}
+
+	char statusTxPacket[6] = { statusId, zn::id, 0x03, 0x00, 0x01, 0x00 };
+	statusTxPacket[5] = checksum(statusTxPacket, sizeof(statusTxPacket));
+
+	uart->printf("%c%c%c%c%c%c", statusTxPacket[0], statusTxPacket[1], statusTxPacket[2], statusTxPacket[3], statusTxPacket[4], statusTxPacket[5] );
+
+	if(!attemptRx(responsePacket, 6)) { // false return means terminated due to timeout
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_TIMEOUT;
+	}
+
+	if(checksum(responsePacket, sizeof(responsePacket)) != 0 ) { // checksum error
+		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4], responsePacket[5] ); }
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_CHECKSUM_ERROR;
+	}
+
+	bool responsePacketEmpty = true;
+	for(unsigned int i = 0; i < sizeof(responsePacket); i++) {
+		if(responsePacket[i] != 0) {
+			responsePacketEmpty = false;
+			break;
+		}
+	}
+
+	if(responsePacketEmpty) { // check for empty packet
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_EMPTY;
+	} 
+	
+	char responseCmp[3] = { zn::id, statusId, 0x03 }; // expected response
+	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
+		*chksumErrCnt = responsePacket[3];
+		*timeoutCnt = responsePacket[4];
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_OK;
+	} else { 
+		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4], responsePacket[5], responsePacket[6], responsePacket[7]); }
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_INVALID;
+	}
+
+	strcpy(responsePacket, "");
+	return ZN_RESPONSE_UNKNOWN_ERROR;
 }
 
 void zn::list(bool deviceArray[]) {
 	for(int i = 1; i < HIGHEST_ADDRESS; i++) {
-		if(ping(i) == PING_RESPONSE_OK) { deviceArray[i] = true; }
+		if(ping(i) == ZN_RESPONSE_OK) { deviceArray[i] = true; }
 		else { deviceArray[i] = false; }
 	}
+}
+
+void zn::sendBadChecksum() {
+	uart->printf("%c%c%c%c%c%c", 0x02, 0x00, 0x03, 0x01, 0x02, 0xbe );
 }

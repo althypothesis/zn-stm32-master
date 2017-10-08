@@ -53,13 +53,13 @@ void cmdList() {
 	pc.printf("\r\nCount: %d\r\n", onlineCount);
 }
 
-void cmdPing(char* rxBuf) {
-	if(rxBuf[4] == ' ' && rxBuf[5] >= '0') { // check for space then 0-9A-F
+void cmdPing(char* pingRxBuf) {
+	if(pingRxBuf[4] == ' ' && pingRxBuf[5] >= '0') { // check for space then 0-9A-F
 		int idToPing;
-		if(rxBuf[6] >= '0') {
-			idToPing = asciiHexToInt(rxBuf[5], rxBuf[6]);
+		if(pingRxBuf[6] >= '0') {
+			idToPing = asciiHexToInt(pingRxBuf[5], pingRxBuf[6]);
 		} else {
-			idToPing = asciiHexToInt('0', rxBuf[5]);
+			idToPing = asciiHexToInt('0', pingRxBuf[5]);
 		}
 		if(idToPing < 0) {
 			pc.printf("\r\nInvalid ID: \'%d\'\r\nExamples: \"ping e9\" or \"ping 3\"\r\n", idToPing);
@@ -67,19 +67,19 @@ void cmdPing(char* rxBuf) {
 			pc.printf("\r\nSending ping to 0x%02x... ", idToPing);
 
 			switch(z.ping(idToPing)) {
-				case PING_RESPONSE_EMPTY: {
+				case ZN_RESPONSE_EMPTY: {
 					pc.printf("Empty Response\r\n"); 
 					break;
-				} case PING_RESPONSE_OK: {
+				} case ZN_RESPONSE_OK: {
 					pc.printf("Success\r\n"); 
 					break;
-				} case PING_RESPONSE_TIMEOUT: {
+				} case ZN_RESPONSE_TIMEOUT: {
 					pc.printf("Timeout\r\n");
 					break;
-				} case PING_RESPONSE_INVALID: {
+				} case ZN_RESPONSE_INVALID: {
 					pc.printf("Invalid Response\r\n");
 					break;
-				} case PING_RESPONSE_CHECKSUM_ERROR: {
+				} case ZN_RESPONSE_CHECKSUM_ERROR: {
 					pc.printf("Checksum Error\r\n");
 					break;
 				} default: {
@@ -89,6 +89,47 @@ void cmdPing(char* rxBuf) {
 		}
 	} else {
 		pc.printf("\r\nInvalid ID\r\nExamples: \"ping e9\" or \"ping 3\"\r\n");
+	}
+}
+
+void cmdStatus(char* statusRxBuf) {
+	if(statusRxBuf[6] == ' ' && statusRxBuf[7] >= '0') { // check for space then 0-9A-F
+		int idToGetStaus;
+		if(statusRxBuf[8] >= '0') {
+			idToGetStaus = asciiHexToInt(statusRxBuf[7], statusRxBuf[8]);
+		} else {
+			idToGetStaus = asciiHexToInt('0', statusRxBuf[7]);
+		}
+		if(idToGetStaus < 0) {
+			pc.printf("\r\nInvalid ID: \'%d\'\r\nExamples: \"status e9\" or \"status 3\"\r\n", idToGetStaus);
+		} else {
+			pc.printf("\r\nRequesting status from 0x%02x... ", idToGetStaus);
+
+			char checksumErrorCount, timeoutCount = 0;
+
+			switch(z.status(idToGetStaus, &checksumErrorCount, &timeoutCount)) {
+				case ZN_RESPONSE_EMPTY: {
+					pc.printf("Empty Response\r\n"); 
+					break;
+				} case ZN_RESPONSE_OK: {
+					pc.printf("Success\r\nChecksum Errors: %d\r\nTimeouts: %d\r\n", checksumErrorCount, timeoutCount);
+					break;
+				} case ZN_RESPONSE_TIMEOUT: {
+					pc.printf("Timeout\r\n");
+					break;
+				} case ZN_RESPONSE_INVALID: {
+					pc.printf("Invalid Response\r\n");
+					break;
+				} case ZN_RESPONSE_CHECKSUM_ERROR: {
+					pc.printf("Checksum Error\r\n");
+					break;
+				} default: {
+					pc.printf("Unknown Error\r\n");
+				}
+			}
+		}
+	} else {
+		pc.printf("\r\nInvalid ID\r\nExamples: \"status e9\" or \"status 3\"\r\n");
 	}
 }
 
@@ -142,6 +183,10 @@ int main() {
 				cmdList();
 			} else if(!strncmp(rxBuf, "ping", 4)) {
 				cmdPing(rxBuf);
+			} else if(!strncmp(rxBuf, "status", 6)) {
+				cmdStatus(rxBuf);
+			} else if(!strcmp(rxBuf, "sendBadChecksum")) {
+				z.sendBadChecksum();
 			} else {
 				pc.printf("\r\nError: Unrecognized command \"%s\"\r\n", rxBuf);
 				cmdHelp();
