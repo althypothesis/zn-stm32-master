@@ -19,6 +19,7 @@ class zn {
 		int ping(char pingId);
 		void list(bool deviceArray[]);
 		int status(char statusId, char* chksumErrCnt, char* timeoutCnt);
+		int inputs(char inputsId, char* inputState);
 		void sendBadChecksum();
 		
 		Serial* debugInterface;

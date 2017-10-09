@@ -158,6 +158,60 @@ int zn::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
 	return ZN_RESPONSE_UNKNOWN_ERROR;
 }
 
+int zn::inputs(char inputsId, char* inputState) {
+	char responsePacket[16] = {};
+
+	// clear the serial buffer first
+	//char char1 = 0; 
+	while (uart->readable()) { 
+		char char1 = uart->getc(); 
+		char1 += 0;
+	}
+
+	char inputsTxPacket[6] = { inputsId, zn::id, 0x03, 0x00, 0x02, 0x00 };
+	inputsTxPacket[5] = checksum(inputsTxPacket, sizeof(inputsTxPacket));
+
+	uart->printf("%c%c%c%c%c%c", inputsTxPacket[0], inputsTxPacket[1], inputsTxPacket[2], inputsTxPacket[3], inputsTxPacket[4], inputsTxPacket[5] );
+
+	if(!attemptRx(responsePacket, 5)) { // false return means terminated due to timeout
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_TIMEOUT;
+	}
+
+	if(checksum(responsePacket, sizeof(responsePacket)) != 0 ) { // checksum error
+		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4] ); }
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_CHECKSUM_ERROR;
+	}
+
+	bool responsePacketEmpty = true;
+	for(unsigned int i = 0; i < sizeof(responsePacket); i++) {
+		if(responsePacket[i] != 0) {
+			responsePacketEmpty = false;
+			break;
+		}
+	}
+
+	if(responsePacketEmpty) { // check for empty packet
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_EMPTY;
+	} 
+	
+	char responseCmp[3] = { zn::id, inputsId, 0x02 }; // expected response
+	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
+		*inputState = responsePacket[3];
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_OK;
+	} else { 
+		if(debugEnable) { debugInterface->printf("\r\nReceived: [ %02x %02x %02x %02x %02x ]\r\n", responsePacket[0], responsePacket[1], responsePacket[2], responsePacket[3], responsePacket[4] ); }
+		strcpy(responsePacket, "");
+		return ZN_RESPONSE_INVALID;
+	}
+
+	strcpy(responsePacket, "");
+	return ZN_RESPONSE_UNKNOWN_ERROR;
+}
+
 void zn::list(bool deviceArray[]) {
 	for(int i = 1; i < HIGHEST_ADDRESS; i++) {
 		if(ping(i) == ZN_RESPONSE_OK) { deviceArray[i] = true; }

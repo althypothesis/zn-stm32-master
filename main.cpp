@@ -94,20 +94,20 @@ void cmdPing(char* pingRxBuf) {
 
 void cmdStatus(char* statusRxBuf) {
 	if(statusRxBuf[6] == ' ' && statusRxBuf[7] >= '0') { // check for space then 0-9A-F
-		int idToGetStaus;
+		int idToGetStatus;
 		if(statusRxBuf[8] >= '0') {
-			idToGetStaus = asciiHexToInt(statusRxBuf[7], statusRxBuf[8]);
+			idToGetStatus = asciiHexToInt(statusRxBuf[7], statusRxBuf[8]);
 		} else {
-			idToGetStaus = asciiHexToInt('0', statusRxBuf[7]);
+			idToGetStatus = asciiHexToInt('0', statusRxBuf[7]);
 		}
-		if(idToGetStaus < 0) {
-			pc.printf("\r\nInvalid ID: \'%d\'\r\nExamples: \"status e9\" or \"status 3\"\r\n", idToGetStaus);
+		if(idToGetStatus < 0) {
+			pc.printf("\r\nInvalid ID: \'%d\'\r\nExamples: \"status e9\" or \"status 3\"\r\n", idToGetStatus);
 		} else {
-			pc.printf("\r\nRequesting status from 0x%02x... ", idToGetStaus);
+			pc.printf("\r\nRequesting status from 0x%02x... ", idToGetStatus);
 
 			char checksumErrorCount, timeoutCount = 0;
 
-			switch(z.status(idToGetStaus, &checksumErrorCount, &timeoutCount)) {
+			switch(z.status(idToGetStatus, &checksumErrorCount, &timeoutCount)) {
 				case ZN_RESPONSE_EMPTY: {
 					pc.printf("Empty Response\r\n"); 
 					break;
@@ -130,6 +130,51 @@ void cmdStatus(char* statusRxBuf) {
 		}
 	} else {
 		pc.printf("\r\nInvalid ID\r\nExamples: \"status e9\" or \"status 3\"\r\n");
+	}
+}
+
+void cmdInputs(char* inputsRxBuf) {
+	if(inputsRxBuf[6] == ' ' && inputsRxBuf[7] >= '0') { // check for space then 0-9A-F
+		int idToGetInputs;
+		if(inputsRxBuf[8] >= '0') {
+			idToGetInputs = asciiHexToInt(inputsRxBuf[7], inputsRxBuf[8]);
+		} else {
+			idToGetInputs = asciiHexToInt('0', inputsRxBuf[7]);
+		}
+		if(idToGetInputs < 0) {
+			pc.printf("\r\nInvalid ID: \'%d\'\r\nExamples: \"inputs e9\" or \"inputs 3\"\r\n", idToGetInputs);
+		} else {
+			pc.printf("\r\nRequesting inputs from 0x%02x... ", idToGetInputs);
+
+			char inputState = 0;
+
+			switch(z.inputs(idToGetInputs, &inputState)) {
+				case ZN_RESPONSE_EMPTY: {
+					pc.printf("Empty Response\r\n"); 
+					break;
+				} case ZN_RESPONSE_OK: {
+					bool inputs[4] = {};
+					for(int i = 0; i < 4; i++) {
+						inputs[i] = inputState & (1<<i);
+					}
+					pc.printf("Success\r\nInputs: 1:%d 2:%d 3:%d 4:%d\r\n", inputs[0], inputs[1], inputs[2], inputs[3]);
+					break;
+				} case ZN_RESPONSE_TIMEOUT: {
+					pc.printf("Timeout\r\n");
+					break;
+				} case ZN_RESPONSE_INVALID: {
+					pc.printf("Invalid Response\r\n");
+					break;
+				} case ZN_RESPONSE_CHECKSUM_ERROR: {
+					pc.printf("Checksum Error\r\n");
+					break;
+				} default: {
+					pc.printf("Unknown Error\r\n");
+				}
+			}
+		}
+	} else {
+		pc.printf("\r\nInvalid ID\r\nExamples: \"inputs e9\" or \"inputs 3\"\r\n");
 	}
 }
 
@@ -185,6 +230,8 @@ int main() {
 				cmdPing(rxBuf);
 			} else if(!strncmp(rxBuf, "status", 6)) {
 				cmdStatus(rxBuf);
+			} else if(!strncmp(rxBuf, "inputs", 6)) {
+				cmdInputs(rxBuf);
 			} else if(!strcmp(rxBuf, "sendBadChecksum")) {
 				z.sendBadChecksum();
 			} else {
