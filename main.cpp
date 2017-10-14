@@ -1,5 +1,5 @@
 #include "mbed.h"
-#include "zn.h"
+#include "ZedNet.h"
 
 #define RXBUFSIZE 64
 #define MYID 0x00
@@ -7,7 +7,7 @@
 Serial pc(USBTX, USBRX);
 DigitalOut led(LED1);
 Serial znSerial(PA_9, PA_10, 19200);
-zn z(&znSerial, MYID);
+ZedNet z(&znSerial, MYID);
 
 
 int asciiHexToInt(char a, char b) {

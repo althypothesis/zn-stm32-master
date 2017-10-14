@@ -1,5 +1,5 @@
-#ifndef ZN_H
-#define ZN_H
+#ifndef ZEDNET_H
+#define ZEDNET_H
 
 #include "mbed.h"
 
@@ -10,9 +10,9 @@
 #define ZN_RESPONSE_UNKNOWN_ERROR 4
 #define ZN_RESPONSE_CHECKSUM_ERROR 5
 
-class zn {
+class ZedNet {
 	public:
-		zn(mbed::Serial* uartInit, int initId);
+		ZedNet(mbed::Serial* uartInit, int initId);
 		char id;
 		double responseTimeout;
 

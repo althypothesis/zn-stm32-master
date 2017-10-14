@@ -1,18 +1,18 @@
 #include "mbed.h"
-#include "zn.h"
+#include "ZedNet.h"
 
 #define HIGHEST_ADDRESS 0x20
 
-zn::zn(mbed::Serial* uartInit, int initId) {
+ZedNet::ZedNet(mbed::Serial* uartInit, int initId) {
 	uart = uartInit;
-	zn::id = initId;
+	ZedNet::id = initId;
 	responseTimeout = 0.5;
 	debugEnable = 0;
 }
 
-void zn::serialAbort() { uart->abort_read(); }
+void ZedNet::serialAbort() { uart->abort_read(); }
 
-char zn::checksum(char* data, int dataLength) {
+char ZedNet::checksum(char* data, int dataLength) {
 	char retVal = 0;
 	for(int i = 0; i < dataLength; i++) {
 		retVal ^= data[i];
@@ -20,7 +20,7 @@ char zn::checksum(char* data, int dataLength) {
 	return retVal;
 }
 
-bool zn::attemptRx(char* attemptRxBuf, int rxLength) {
+bool ZedNet::attemptRx(char* attemptRxBuf, int rxLength) {
 	//char attemptRxBuf[32];
 	char attemptRxChar;
 	int rxIndex = 0;
@@ -30,7 +30,7 @@ bool zn::attemptRx(char* attemptRxBuf, int rxLength) {
 	t.start();
 
 	Timeout to;
-	to.attach(callback(this, &zn::serialAbort), (responseTimeout+0.1)); // in case we get stuck at a getc()
+	to.attach(callback(this, &ZedNet::serialAbort), (responseTimeout+0.1)); // in case we get stuck at a getc()
 
 	while(t.read() < responseTimeout) {
 		if(uart->readable()) {
@@ -50,7 +50,7 @@ bool zn::attemptRx(char* attemptRxBuf, int rxLength) {
 	return !attemptTimeout;
 }
 
-int zn::ping(char pingId) {
+int ZedNet::ping(char pingId) {
 	char responsePacket[16] = {};
 
 	// clear the serial buffer first
@@ -60,7 +60,7 @@ int zn::ping(char pingId) {
 		char1 += 0;
 	}
 
-	char pingPacket[6] = { pingId, zn::id, 0x03, 0x00, 0x00, 0x00 };
+	char pingPacket[6] = { pingId, ZedNet::id, 0x03, 0x00, 0x00, 0x00 };
 	pingPacket[5] = checksum(pingPacket, sizeof(pingPacket));
 
 	uart->printf("%c%c%c%c%c%c", pingPacket[0], pingPacket[1], pingPacket[2], pingPacket[3], pingPacket[4], pingPacket[5] );
@@ -89,7 +89,7 @@ int zn::ping(char pingId) {
 		return ZN_RESPONSE_EMPTY;
 	} 
 	
-	char responseCmp[3] = { zn::id, pingId, 0x05 };
+	char responseCmp[3] = { ZedNet::id, pingId, 0x05 };
 	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
 		strcpy(responsePacket, "");
 		return ZN_RESPONSE_OK;
@@ -103,7 +103,7 @@ int zn::ping(char pingId) {
 	return ZN_RESPONSE_UNKNOWN_ERROR;
 }
 
-int zn::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
+int ZedNet::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
 	char responsePacket[16] = {};
 
 	// clear the serial buffer first
@@ -113,7 +113,7 @@ int zn::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
 		char1 += 0;
 	}
 
-	char statusTxPacket[6] = { statusId, zn::id, 0x03, 0x00, 0x01, 0x00 };
+	char statusTxPacket[6] = { statusId, ZedNet::id, 0x03, 0x00, 0x01, 0x00 };
 	statusTxPacket[5] = checksum(statusTxPacket, sizeof(statusTxPacket));
 
 	uart->printf("%c%c%c%c%c%c", statusTxPacket[0], statusTxPacket[1], statusTxPacket[2], statusTxPacket[3], statusTxPacket[4], statusTxPacket[5] );
@@ -142,7 +142,7 @@ int zn::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
 		return ZN_RESPONSE_EMPTY;
 	} 
 	
-	char responseCmp[3] = { zn::id, statusId, 0x03 }; // expected response
+	char responseCmp[3] = { ZedNet::id, statusId, 0x03 }; // expected response
 	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
 		*chksumErrCnt = responsePacket[3];
 		*timeoutCnt = responsePacket[4];
@@ -158,7 +158,7 @@ int zn::status(char statusId, char* chksumErrCnt, char* timeoutCnt) {
 	return ZN_RESPONSE_UNKNOWN_ERROR;
 }
 
-int zn::inputs(char inputsId, char* inputState) {
+int ZedNet::inputs(char inputsId, char* inputState) {
 	char responsePacket[16] = {};
 
 	// clear the serial buffer first
@@ -168,7 +168,7 @@ int zn::inputs(char inputsId, char* inputState) {
 		char1 += 0;
 	}
 
-	char inputsTxPacket[6] = { inputsId, zn::id, 0x03, 0x00, 0x02, 0x00 };
+	char inputsTxPacket[6] = { inputsId, ZedNet::id, 0x03, 0x00, 0x02, 0x00 };
 	inputsTxPacket[5] = checksum(inputsTxPacket, sizeof(inputsTxPacket));
 
 	uart->printf("%c%c%c%c%c%c", inputsTxPacket[0], inputsTxPacket[1], inputsTxPacket[2], inputsTxPacket[3], inputsTxPacket[4], inputsTxPacket[5] );
@@ -197,7 +197,7 @@ int zn::inputs(char inputsId, char* inputState) {
 		return ZN_RESPONSE_EMPTY;
 	} 
 	
-	char responseCmp[3] = { zn::id, inputsId, 0x02 }; // expected response
+	char responseCmp[3] = { ZedNet::id, inputsId, 0x02 }; // expected response
 	if(responsePacket[0] == responseCmp[0] && responsePacket[1] == responseCmp[1] && responsePacket[2] == responseCmp[2]) {
 		*inputState = responsePacket[3];
 		strcpy(responsePacket, "");
@@ -212,13 +212,13 @@ int zn::inputs(char inputsId, char* inputState) {
 	return ZN_RESPONSE_UNKNOWN_ERROR;
 }
 
-void zn::list(bool deviceArray[]) {
+void ZedNet::list(bool deviceArray[]) {
 	for(int i = 1; i < HIGHEST_ADDRESS; i++) {
 		if(ping(i) == ZN_RESPONSE_OK) { deviceArray[i] = true; }
 		else { deviceArray[i] = false; }
 	}
 }
 
-void zn::sendBadChecksum() {
+void ZedNet::sendBadChecksum() {
 	uart->printf("%c%c%c%c%c%c", 0x02, 0x00, 0x03, 0x01, 0x02, 0xbe );
 }
